@@ -1,0 +1,33 @@
+name: Cargo registry configuration CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  registry-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate the Cargo index configuration offline
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
+          from urllib.parse import urlsplit
+
+          config = json.loads(Path("config.json").read_text())
+          for field in ("dl", "api"):
+              if field == "api" and field not in config:
+                  continue
+              url = urlsplit(config[field])
+              if url.scheme not in ("https", "http") or not url.hostname:
+                  raise SystemExit(f"{field} must specify an absolute HTTP(S) URL")
+          if "auth-required" in config and not isinstance(config["auth-required"], bool):
+              raise SystemExit("auth-required must be a JSON boolean")
+          PYTHON
